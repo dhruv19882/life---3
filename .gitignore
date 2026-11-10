@@ -1,0 +1,8 @@
+# Personal data must never be committed
+lifeos-backup-*.json
+lifeos-before-restore-*.json
+lifeos-starter-*.json
+lifeos-*.csv
+*.private.json
+work-report-*.txt
+.DS_Store

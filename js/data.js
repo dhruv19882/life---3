@@ -1,281 +1,325 @@
 'use strict';
-/* Static data and calculators: nutrition targets, Indian low-budget bulk diet, workout program. */
+/* Reference data and calculators: profile, nutrition targets, exercise library, workout split,
+   CMA syllabus, career roadmap, Dubai plan defaults, work areas. */
 (function () {
-  /* ---------- Nutrition targets ---------- */
-  const ACTIVITY = [
-    { id: 1.375, label: 'Light', note: 'Gym 2–3 days, desk job/student' },
-    { id: 1.55, label: 'Moderate', note: 'Gym 4–6 days' },
-    { id: 1.725, label: 'Very active', note: 'Gym 6 days + physical job/sport' },
-  ];
+  /* ---------- profile ---------- */
+  // Personal details are NOT stored in the source code (the code may be hosted publicly).
+  // They are entered during setup or restored from a private starter/backup file.
+  App.profileDefaults = () => ({
+    name: '', gender: 'male', age: '', height: '', weight: '',
+    targets: [], education: '', qualification: '', careerGoal: 'Finance Analyst / FP&A Analyst', field: 'Accounts & Finance',
+    location: '', currency: 'INR', tz: 'Asia/Kolkata',
+    activity: 1.55, mode: 'bulk', workStart: '14:00', workEnd: '23:00', workDays: [1, 2, 3, 4, 5],
+    avatar: '',
+  });
 
+  /* ---------- nutrition targets ---------- */
+  const ACTIVITY = [
+    { id: 1.2, label: 'Sedentary', note: 'Desk work, no training' },
+    { id: 1.375, label: 'Light', note: 'Gym 2–3 days' },
+    { id: 1.55, label: 'Moderate', note: 'Gym 4–5 days + desk job' },
+    { id: 1.725, label: 'Very active', note: 'Gym 6 days or physical job' },
+  ];
   const GOAL_MODES = {
     bulk: { label: 'Lean bulk', surplus: 400, protein: 2.0 },
     maintain: { label: 'Maintain', surplus: 0, protein: 1.8 },
     cut: { label: 'Fat loss', surplus: -400, protein: 2.2 },
   };
 
-  function targets(p) {
+  /** Daily targets. Mifflin-St Jeor BMR × activity, plus goal surplus. Any target can be overridden in settings. */
+  function targets(p, o) {
     if (!p) return null;
-    // Mifflin-St Jeor BMR
+    o = o || (App.state && App.state.nutrition && App.state.nutrition.targets) || {};
     const bmr = 10 * p.weight + 6.25 * p.height - 5 * p.age + (p.gender === 'female' ? -161 : 5);
-    const tdee = bmr * p.activity;
+    const tdee = bmr * (+p.activity || 1.55);
     const mode = GOAL_MODES[p.mode] || GOAL_MODES.bulk;
-    const kcal = Math.round((tdee + mode.surplus) / 10) * 10;
-    const protein = Math.round(p.weight * mode.protein);
-    const fat = Math.round((kcal * 0.25) / 9);
-    const carbs = Math.round((kcal - protein * 4 - fat * 9) / 4);
-    const water = Math.round(p.weight * 0.045 * 10) / 10 + 0.5; // litres, extra for training
-    return { bmr: Math.round(bmr), tdee: Math.round(tdee), kcal, protein, fat, carbs, water, mode };
+    const autoKcal = Math.round((tdee + mode.surplus) / 10) * 10;
+    const kcal = +o.kcal > 0 ? Math.round(+o.kcal) : autoKcal;
+    const protein = +o.protein > 0 ? Math.round(+o.protein) : Math.round(p.weight * mode.protein);
+    const fat = +o.fat > 0 ? Math.round(+o.fat) : Math.round((kcal * 0.25) / 9);
+    const carbs = +o.carbs > 0 ? Math.round(+o.carbs) : Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4));
+    const waterMl = +o.waterMl > 0 ? Math.round(+o.waterMl) : Math.round((p.weight * 35 + 500) / 50) * 50;
+    return { bmr: Math.round(bmr), tdee: Math.round(tdee), autoKcal, kcal, protein, fat, carbs, waterMl, water: waterMl / 1000, mode, overridden: Object.keys(o).filter((k) => +o[k] > 0) };
   }
 
-  /* ---------- Indian low-budget foods (approx. values per serving) ---------- */
-  // kcal, p (protein g), c (carbs g), f (fat g), cost (₹, approx. city retail prices)
-  const F = {
-    milk: { name: 'Toned milk', qty: '250 ml', kcal: 145, p: 7.8, c: 11.8, f: 7.5, cost: 14 },
-    oats: { name: 'Rolled oats', qty: '50 g', kcal: 190, p: 6.7, c: 33, f: 3.5, cost: 9 },
-    banana: { name: 'Banana', qty: '1 medium', kcal: 105, p: 1.3, c: 27, f: 0.4, cost: 6 },
-    banana2: { name: 'Bananas', qty: '2 medium', kcal: 210, p: 2.6, c: 54, f: 0.8, cost: 12 },
-    pb: { name: 'Peanut butter', qty: '1 tbsp (16 g)', kcal: 94, p: 4, c: 3, f: 8, cost: 6 },
-    eggs3: { name: 'Boiled eggs', qty: '3 whole', kcal: 234, p: 18.9, c: 1.8, f: 15.9, cost: 21 },
-    chana: { name: 'Roasted chana', qty: '30 g', kcal: 110, p: 6, c: 17, f: 1.8, cost: 4 },
-    rice: { name: 'Cooked rice', qty: '1 cup (160 g)', kcal: 205, p: 4.3, c: 45, f: 0.4, cost: 3 },
-    dal: { name: 'Dal (toor/moong) with tadka', qty: '1 bowl (40 g raw)', kcal: 180, p: 9, c: 24, f: 5.5, cost: 8 },
-    roti2: { name: 'Roti', qty: '2 medium', kcal: 200, p: 7, c: 42, f: 1, cost: 3 },
-    roti3: { name: 'Roti', qty: '3 medium', kcal: 300, p: 10.5, c: 63, f: 1.5, cost: 5 },
-    sabzi: { name: 'Seasonal sabzi', qty: '1 bowl', kcal: 100, p: 2.5, c: 12, f: 5, cost: 12 },
-    curd: { name: 'Curd (dahi)', qty: '150 g', kcal: 90, p: 5, c: 7, f: 4.5, cost: 10 },
-    peanuts: { name: 'Roasted peanuts', qty: '30 g', kcal: 170, p: 7.5, c: 5, f: 14.5, cost: 5 },
-    soya: { name: 'Soya chunk curry', qty: '50 g dry + 1 tsp oil', kcal: 212, p: 26, c: 16.5, f: 4.7, cost: 11 },
-    salad: { name: 'Salad (onion, tomato, cucumber)', qty: '1 plate', kcal: 30, p: 1, c: 6, f: 0, cost: 5 },
+  /* Totals of the original app's fixed diet plan (used only to migrate old check-offs). */
+  const LEGACY_PLAN = {
+    m1: { name: 'Breakfast', slot: 'breakfast', kcal: 534, p: 19.8, c: 74.8, f: 19.4 },
+    m2: { name: 'Mid-morning', slot: 'snacks', kcal: 344, p: 24.9, c: 18.8, f: 17.7 },
+    m3: { name: 'Lunch', slot: 'lunch', kcal: 775, p: 27.8, c: 130, f: 16.4 },
+    m4: { name: 'Pre-workout', slot: 'snacks', kcal: 380, p: 10.1, c: 59, f: 15.3 },
+    m5: { name: 'Post-workout dinner', slot: 'dinner', kcal: 542, p: 37.5, c: 85.5, f: 6.2 },
+    m6: { name: 'Before bed', slot: 'snacks', kcal: 145, p: 7.8, c: 11.8, f: 7.5 },
+    b1: { name: 'Mass gainer shake', slot: 'snacks', kcal: 534, p: 19.8, c: 74.8, f: 19.4 },
+    b2: { name: 'Extra rice + dal', slot: 'lunch', kcal: 385, p: 13.3, c: 69, f: 5.9 },
+    b3: { name: 'Peanut snack', slot: 'snacks', kcal: 275, p: 8.8, c: 32, f: 14.9 },
   };
 
-  const sum = (items) =>
-    items.reduce(
-      (a, k) => {
-        const x = F[k];
-        a.kcal += x.kcal; a.p += x.p; a.c += x.c; a.f += x.f; a.cost += x.cost;
-        return a;
-      },
-      { kcal: 0, p: 0, c: 0, f: 0, cost: 0 }
-    );
-
-  const BASE_MEALS = [
-    { id: 'm1', time: '7:30 AM', name: 'Breakfast', emoji: '🥣', items: ['oats', 'milk', 'banana', 'pb'],
-      how: 'Cook oats in the milk for 3–4 min. Top with sliced banana and peanut butter.',
-      swap: 'No oats? Use 2 plates of poha/upma with peanuts.' },
-    { id: 'm2', time: '11:00 AM', name: 'Mid-morning', emoji: '🥚', items: ['eggs3', 'chana'],
-      how: 'Boil eggs the night before. Carry roasted chana in a small box.',
-      swap: 'Vegetarian: 75 g paneer bhurji or 50 g extra soya chunks.' },
-    { id: 'm3', time: '1:30 PM', name: 'Lunch', emoji: '🍛', items: ['rice', 'dal', 'roti2', 'sabzi', 'curd'],
-      how: 'Normal home thali. Do not skip the dal and curd, they carry the protein.',
-      swap: 'Rajma or chole instead of dal works the same.' },
-    { id: 'm4', time: '5:00 PM', name: 'Pre-workout', emoji: '🍌', items: ['banana2', 'peanuts'],
-      how: 'Eat 45–60 min before the gym for steady energy.',
-      swap: 'Peanut chikki (1 bar) instead of peanuts.' },
-    { id: 'm5', time: '8:30 PM', name: 'Post-workout dinner', emoji: '🍲', items: ['roti3', 'soya', 'salad'],
-      how: 'Soak soya chunks in hot water 10 min, squeeze, then cook like a sabzi with onion-tomato masala.',
-      swap: 'Non-veg: 150 g chicken curry instead of soya.' },
-    { id: 'm6', time: '10:30 PM', name: 'Before bed', emoji: '🥛', items: ['milk'],
-      how: 'Warm milk with a pinch of haldi. Slow protein while you sleep.',
-      swap: '150 g curd if milk does not suit you.' },
-  ];
-
-  const BOOSTERS = [
-    { id: 'b1', time: 'Any time', name: 'Desi mass gainer shake', emoji: '🥤', booster: true,
-      items: ['milk', 'banana', 'oats', 'pb'],
-      how: 'Blend 250 ml milk + 1 banana + 50 g oats + 1 tbsp peanut butter. Cheaper than any gainer powder.',
-      swap: 'Add 1 tsp honey or 2 dates for extra calories.' },
-    { id: 'b2', time: 'With lunch/dinner', name: 'Extra rice + dal', emoji: '🍚', booster: true, items: ['rice', 'dal'],
-      how: 'One more serving of rice and dal at lunch or dinner.', swap: 'Or 2 extra rotis.' },
-    { id: 'b3', time: 'Evening', name: 'Peanut snack', emoji: '🥜', booster: true, items: ['peanuts', 'banana'],
-      how: 'Handful of peanuts with a banana.', swap: 'Or 1 peanut chikki bar.' },
-  ];
-
-  const mealTotals = (m) => sum(m.items);
-
-  /** Build a plan close to the calorie target by adding boosters or trimming meals. */
-  function dietPlan(t) {
-    let meals = BASE_MEALS.map((m) => ({ ...m, ...mealTotals(m) }));
-    const total = () => meals.reduce((a, m) => a + m.kcal, 0);
-    if (t) {
-      let i = 0;
-      while (t.kcal - total() > 150 && i < BOOSTERS.length) {
-        const b = BOOSTERS[i++];
-        meals.push({ ...b, ...mealTotals(b) });
-      }
-      // Trim order if plan is too large for the target
-      const trim = ['m6', 'm4', 'm2'];
-      let j = 0;
-      while (total() - t.kcal > 200 && j < trim.length) {
-        meals = meals.filter((m) => m.id !== trim[j++]);
-      }
-    }
-    const tot = meals.reduce(
-      (a, m) => ({ kcal: a.kcal + m.kcal, p: a.p + m.p, c: a.c + m.c, f: a.f + m.f, cost: a.cost + m.cost }),
-      { kcal: 0, p: 0, c: 0, f: 0, cost: 0 }
-    );
-    return { meals, total: tot };
-  }
-
-  const SHOPPING = [
-    ['Toned milk', '15–20 L', 840],
-    ['Rolled oats', '1.5 kg', 270],
-    ['Bananas', '~150 pcs', 900],
-    ['Eggs', '90 pcs (or paneer)', 630],
-    ['Soya chunks', '1.5 kg', 300],
-    ['Peanuts + peanut butter', '1 kg + 500 g', 450],
-    ['Roasted chana', '1 kg', 140],
-    ['Dal + rice + atta', '1.2 kg + 2 kg + 5 kg', 650],
-    ['Curd + sabzi + salad', 'daily', 800],
-  ];
-
-  /* ---------- Exercise library ---------- */
+  /* ---------- exercise library ---------- */
+  // group = primary muscle group used for weekly set statistics
   const EX = {
-    bench: { name: 'Barbell Bench Press', muscle: 'Chest, front delts, triceps', kind: 'upper',
+    bench: { name: 'Barbell Bench Press', group: 'chest', muscle: 'Chest, front delts, triceps', kind: 'upper', tempo: [3, 1, 1],
       steps: ['Lie flat, eyes under the bar, feet planted.', 'Grip slightly wider than shoulders, squeeze shoulder blades together.', 'Lower the bar to mid-chest in 2–3 seconds, elbows ~45° from body.', 'Press up and slightly back until arms are straight.'],
-      tip: 'Keep your butt on the bench and wrists stacked over elbows.', mistake: 'Bouncing the bar off the chest.' },
-    incDb: { name: 'Incline Dumbbell Press', muscle: 'Upper chest, front delts', kind: 'upper',
+      tip: 'Keep your hips on the bench and wrists stacked over elbows.', mistake: 'Bouncing the bar off the chest.' },
+    incDb: { name: 'Incline Dumbbell Press', group: 'chest', muscle: 'Upper chest, front delts', kind: 'upper', tempo: [3, 1, 1],
       steps: ['Set bench to 30°.', 'Start with dumbbells at chest level, palms forward.', 'Press up until arms are straight, dumbbells close but not touching.', 'Lower slowly until you feel a stretch in the chest.'],
       tip: 'A 30° incline hits the upper chest best; higher turns it into a shoulder press.', mistake: 'Flaring elbows to 90°.' },
-    ohpDb: { name: 'Seated Dumbbell Shoulder Press', muscle: 'Shoulders, triceps', kind: 'upper',
-      steps: ['Sit on a bench set upright, back supported.', 'Dumbbells at ear height, palms forward.', 'Press overhead until arms are nearly straight.', 'Lower under control to ear level.'],
-      tip: 'Brace your core so your lower back does not arch.', mistake: 'Cutting the range short.' },
-    lateral: { name: 'Dumbbell Lateral Raise', muscle: 'Side delts (shoulder width)', kind: 'upper',
-      steps: ['Stand tall, light dumbbells at your sides.', 'Slight bend in elbows, lean forward a little.', 'Raise arms out to the side to shoulder height.', 'Lower in 2–3 seconds.'],
-      tip: 'Lead with your elbows, imagine pouring water from a jug at the top.', mistake: 'Swinging heavy weights with the body.' },
-    pushdown: { name: 'Cable Triceps Pushdown', muscle: 'Triceps', kind: 'upper',
-      steps: ['Rope or bar attachment at the top of the cable.', 'Elbows pinned to your sides.', 'Push down until arms are straight, squeeze triceps.', 'Let it come back up to 90° slowly.'],
-      tip: 'Only your forearms move.', mistake: 'Elbows drifting forward.' },
-    ohTri: { name: 'Overhead Dumbbell Triceps Extension', muscle: 'Triceps (long head)', kind: 'upper',
-      steps: ['Hold one dumbbell with both hands overhead.', 'Lower it behind your head by bending elbows.', 'Feel a deep stretch, then extend back up.', 'Keep elbows pointing forward.'],
-      tip: 'Sit down for more stability.', mistake: 'Elbows flaring wide.' },
-    pulldown: { name: 'Lat Pulldown', muscle: 'Lats (back width), biceps', kind: 'upper',
-      steps: ['Grip bar slightly wider than shoulders.', 'Lean back slightly, chest up.', 'Pull the bar to your upper chest, driving elbows down.', 'Let it rise slowly until arms are straight.'],
-      tip: 'Think "elbows to back pockets".', mistake: 'Pulling behind the neck or swinging.' },
-    bbRow: { name: 'Barbell Row', muscle: 'Mid back, lats, rear delts', kind: 'upper',
-      steps: ['Hinge forward to ~45°, back flat, knees soft.', 'Grip just outside the knees.', 'Pull the bar to your lower ribs.', 'Lower with control, keep the back angle fixed.'],
-      tip: 'Brace your core like someone will punch your stomach.', mistake: 'Rounding the lower back.' },
-    cableRow: { name: 'Seated Cable Row', muscle: 'Mid back, lats', kind: 'upper',
-      steps: ['Sit tall, feet on platform, slight knee bend.', 'Pull handle to your belly button.', 'Squeeze shoulder blades together for 1 second.', 'Reach forward slowly for a stretch.'],
-      tip: 'Keep your chest up, do not rock back.', mistake: 'Using your lower back to pull.' },
-    facePull: { name: 'Face Pull', muscle: 'Rear delts, upper back (posture)', kind: 'upper',
-      steps: ['Rope at upper chest height.', 'Pull towards your face, hands ending beside ears.', 'Rotate so knuckles face the ceiling.', 'Return slowly.'],
-      tip: 'Light weight, slow reps. Great for shoulder health.', mistake: 'Going too heavy.' },
-    bbCurl: { name: 'Barbell Curl', muscle: 'Biceps', kind: 'upper',
-      steps: ['Stand tall, shoulder-width grip, palms up.', 'Curl the bar up keeping elbows at your sides.', 'Squeeze at the top.', 'Lower in 2–3 seconds.'],
-      tip: 'An EZ bar is easier on the wrists.', mistake: 'Swinging the hips.' },
-    hammer: { name: 'Hammer Curl', muscle: 'Biceps, forearms', kind: 'upper',
-      steps: ['Dumbbells at sides, palms facing each other.', 'Curl up without rotating the wrist.', 'Pause at shoulder height.', 'Lower slowly.'],
-      tip: 'Builds thicker-looking arms.', mistake: 'Moving the elbows forward.' },
-    squat: { name: 'Barbell Back Squat', muscle: 'Quads, glutes, core', kind: 'lower',
-      steps: ['Bar on upper back, feet shoulder-width, toes slightly out.', 'Breathe in and brace your core.', 'Sit down between your heels until thighs are at least parallel.', 'Drive up through the whole foot, knees tracking over toes.'],
-      tip: 'Start with the empty bar and film your form from the side.', mistake: 'Knees caving inward.' },
-    rdl: { name: 'Romanian Deadlift', muscle: 'Hamstrings, glutes, lower back', kind: 'lower',
-      steps: ['Hold bar at hip height, knees slightly bent.', 'Push hips back, bar sliding down your thighs.', 'Stop when you feel a strong hamstring stretch (around mid-shin).', 'Squeeze glutes to stand up.'],
-      tip: 'Back stays flat the entire time.', mistake: 'Turning it into a squat.' },
-    legPress: { name: 'Leg Press', muscle: 'Quads, glutes', kind: 'lower',
-      steps: ['Feet shoulder-width in the middle of the platform.', 'Lower until knees reach ~90°.', 'Press back up without locking the knees.', 'Keep your lower back flat on the pad.'],
-      tip: 'Control the bottom, do not let the hips lift.', mistake: 'Locking knees at the top.' },
-    legCurl: { name: 'Lying Leg Curl', muscle: 'Hamstrings', kind: 'lower',
-      steps: ['Lie face down, pad just above heels.', 'Curl heels toward your glutes.', 'Squeeze for 1 second.', 'Lower slowly.'],
-      tip: 'Keep hips pressed into the bench.', mistake: 'Lifting hips to cheat.' },
-    calf: { name: 'Standing Calf Raise', muscle: 'Calves', kind: 'lower',
-      steps: ['Balls of feet on a step or platform.', 'Lower heels for a full stretch.', 'Rise as high as possible.', 'Pause 1 second at top and bottom.'],
-      tip: 'Full range beats heavy weight for calves.', mistake: 'Bouncing quickly.' },
-    plank: { name: 'Plank', muscle: 'Core', kind: 'core', timed: true,
-      steps: ['Forearms on the floor, elbows under shoulders.', 'Body in a straight line from head to heels.', 'Squeeze glutes and brace abs.', 'Breathe normally and hold.'],
-      tip: 'Reps column = seconds held.', mistake: 'Hips sagging or piking up.' },
-    ohp: { name: 'Standing Overhead Press', muscle: 'Shoulders, triceps, core', kind: 'upper',
-      steps: ['Bar on front of shoulders, grip just outside shoulders.', 'Squeeze glutes and brace.', 'Press straight up, moving your head back then through.', 'Lock out overhead, bar over mid-foot.'],
-      tip: 'Do not lean back; tight glutes keep you upright.', mistake: 'Arching the lower back.' },
-    dbBench: { name: 'Flat Dumbbell Press', muscle: 'Chest, triceps', kind: 'upper',
+    dbBench: { name: 'Flat Dumbbell Press', group: 'chest', muscle: 'Chest, triceps', kind: 'upper', tempo: [3, 1, 1],
       steps: ['Lie flat with dumbbells at chest level.', 'Press up and slightly together.', 'Lower slowly for a deep chest stretch.', 'Keep shoulder blades pinched.'],
       tip: 'Dumbbells fix left-right strength imbalances.', mistake: 'Going too deep with shoulders rolling forward.' },
-    fly: { name: 'Pec Deck / Cable Fly', muscle: 'Chest', kind: 'upper',
+    fly: { name: 'Pec Deck / Cable Fly', group: 'chest', muscle: 'Chest', kind: 'upper', tempo: [3, 1, 1],
       steps: ['Sit or stand with a slight bend in the elbows.', 'Bring hands together in a hugging motion.', 'Squeeze the chest for 1 second.', 'Open slowly to a comfortable stretch.'],
       tip: 'Elbow angle stays fixed throughout.', mistake: 'Turning it into a press.' },
-    dips: { name: 'Bench or Parallel Dips', muscle: 'Triceps, chest', kind: 'upper',
+    pushup: { name: 'Push-up', group: 'chest', muscle: 'Chest, triceps, core', kind: 'upper', bodyweight: true, tempo: [2, 0, 1],
+      steps: ['Hands slightly wider than shoulders, body straight.', 'Lower chest to just above the floor.', 'Push the floor away to straight arms.', 'Keep glutes and abs tight.'],
+      tip: 'Elevate hands on a bench if full push-ups are too hard.', mistake: 'Hips sagging.' },
+    dips: { name: 'Bench or Parallel Dips', group: 'triceps', muscle: 'Triceps, chest', kind: 'upper', bodyweight: true, tempo: [2, 0, 1],
       steps: ['Hands on bars (or bench behind you).', 'Lower until elbows reach 90°.', 'Push back up to straight arms.', 'Lean slightly forward for more chest.'],
-      tip: 'Use bench dips or the assisted machine if bar dips are too hard.', mistake: 'Going too deep and hurting the shoulders.' },
-    deadlift: { name: 'Conventional Deadlift', muscle: 'Full posterior chain', kind: 'lower',
-      steps: ['Bar over mid-foot, feet hip-width.', 'Hinge down, grip just outside legs, shins touching bar.', 'Chest up, back flat, pull the slack out of the bar.', 'Push the floor away, stand tall, then lower the same path.'],
-      tip: 'Start light and master the hinge. Quality over ego.', mistake: 'Rounding the back or jerking the bar.' },
-    pullup: { name: 'Pull-up / Assisted Pull-up', muscle: 'Lats, biceps', kind: 'upper',
-      steps: ['Hang with an overhand grip, shoulder-width.', 'Pull your chest toward the bar.', 'Chin clears the bar.', 'Lower to a full hang slowly.'],
-      tip: 'Use the assisted machine or a band if you cannot do 5 reps yet.', mistake: 'Half reps and kicking.' },
-    dbRow: { name: 'One-arm Dumbbell Row', muscle: 'Lats, mid back', kind: 'upper',
+      tip: 'Use bench dips or the assisted machine if bar dips are too hard.', mistake: 'Going too deep and straining the shoulders.' },
+    pushdown: { name: 'Cable Triceps Pushdown', group: 'triceps', muscle: 'Triceps', kind: 'upper', tempo: [2, 1, 1],
+      steps: ['Rope or bar attachment at the top of the cable.', 'Elbows pinned to your sides.', 'Push down until arms are straight, squeeze triceps.', 'Let it come back up to 90° slowly.'],
+      tip: 'Only your forearms move.', mistake: 'Elbows drifting forward.' },
+    ohTri: { name: 'Overhead Dumbbell Triceps Extension', group: 'triceps', muscle: 'Triceps (long head)', kind: 'upper', tempo: [3, 1, 1],
+      steps: ['Hold one dumbbell with both hands overhead.', 'Lower it behind your head by bending elbows.', 'Feel a deep stretch, then extend back up.', 'Keep elbows pointing forward.'],
+      tip: 'Sit down for more stability.', mistake: 'Elbows flaring wide.' },
+    skull: { name: 'EZ-bar Skull Crusher', group: 'triceps', muscle: 'Triceps', kind: 'upper', tempo: [3, 0, 1],
+      steps: ['Lie flat, EZ bar over your chest with arms straight.', 'Bend only at the elbows to lower the bar toward your forehead.', 'Stop just above the head.', 'Extend back to straight arms.'],
+      tip: 'Let the bar drift slightly behind the head for a bigger stretch.', mistake: 'Moving the upper arms.' },
+    pulldown: { name: 'Lat Pulldown', group: 'back', muscle: 'Lats (back width), biceps', kind: 'upper', tempo: [2, 1, 1],
+      steps: ['Grip bar slightly wider than shoulders.', 'Lean back slightly, chest up.', 'Pull the bar to your upper chest, driving elbows down.', 'Let it rise slowly until arms are straight.'],
+      tip: 'Think "elbows to back pockets".', mistake: 'Pulling behind the neck or swinging.' },
+    bbRow: { name: 'Barbell Row', group: 'back', muscle: 'Mid back, lats, rear delts', kind: 'upper', tempo: [2, 1, 1],
+      steps: ['Hinge forward to ~45°, back flat, knees soft.', 'Grip just outside the knees.', 'Pull the bar to your lower ribs.', 'Lower with control, keep the back angle fixed.'],
+      tip: 'Brace your core hard before each rep.', mistake: 'Rounding the lower back.' },
+    cableRow: { name: 'Seated Cable Row', group: 'back', muscle: 'Mid back, lats', kind: 'upper', tempo: [2, 1, 1],
+      steps: ['Sit tall, feet on platform, slight knee bend.', 'Pull handle to your belly button.', 'Squeeze shoulder blades together for 1 second.', 'Reach forward slowly for a stretch.'],
+      tip: 'Keep your chest up, do not rock back.', mistake: 'Using your lower back to pull.' },
+    dbRow: { name: 'One-arm Dumbbell Row', group: 'back', muscle: 'Lats, mid back', kind: 'upper', tempo: [2, 1, 1],
       steps: ['One knee and hand on the bench, back flat.', 'Pull dumbbell to your hip.', 'Squeeze the back at the top.', 'Lower to a full stretch.'],
       tip: 'Pull with the elbow, not the hand.', mistake: 'Twisting the torso.' },
-    rearFly: { name: 'Rear Delt Fly', muscle: 'Rear delts', kind: 'upper',
+    pullup: { name: 'Pull-up / Assisted Pull-up', group: 'back', muscle: 'Lats, biceps', kind: 'upper', bodyweight: true, tempo: [3, 0, 1],
+      steps: ['Hang with an overhand grip, shoulder-width.', 'Pull your chest toward the bar.', 'Chin clears the bar.', 'Lower to a full hang slowly.'],
+      tip: 'Use the assisted machine or a band if you cannot do 5 reps yet. Log assistance as negative kg if you like.', mistake: 'Half reps and kicking.' },
+    facePull: { name: 'Face Pull', group: 'shoulders', muscle: 'Rear delts, upper back (posture)', kind: 'upper', tempo: [2, 1, 1],
+      steps: ['Rope at upper chest height.', 'Pull towards your face, hands ending beside ears.', 'Rotate so knuckles face the ceiling.', 'Return slowly.'],
+      tip: 'Light weight, slow reps. Good for shoulder health.', mistake: 'Going too heavy.' },
+    deadlift: { name: 'Conventional Deadlift', group: 'back', muscle: 'Full posterior chain', kind: 'lower', tempo: [2, 0, 1],
+      steps: ['Bar over mid-foot, feet hip-width.', 'Hinge down, grip just outside legs, shins touching bar.', 'Chest up, back flat, pull the slack out of the bar.', 'Push the floor away, stand tall, then lower the same path.'],
+      tip: 'Start light and master the hinge.', mistake: 'Rounding the back or jerking the bar.' },
+    ohpDb: { name: 'Seated Dumbbell Shoulder Press', group: 'shoulders', muscle: 'Shoulders, triceps', kind: 'upper', tempo: [2, 1, 1],
+      steps: ['Sit on a bench set upright, back supported.', 'Dumbbells at ear height, palms forward.', 'Press overhead until arms are nearly straight.', 'Lower under control to ear level.'],
+      tip: 'Brace your core so your lower back does not arch.', mistake: 'Cutting the range short.' },
+    ohp: { name: 'Standing Overhead Press', group: 'shoulders', muscle: 'Shoulders, triceps, core', kind: 'upper', tempo: [2, 1, 1],
+      steps: ['Bar on front of shoulders, grip just outside shoulders.', 'Squeeze glutes and brace.', 'Press straight up, moving your head back then through.', 'Lock out overhead, bar over mid-foot.'],
+      tip: 'Tight glutes keep you upright.', mistake: 'Arching the lower back.' },
+    lateral: { name: 'Dumbbell Lateral Raise', group: 'shoulders', muscle: 'Side delts (shoulder width)', kind: 'upper', tempo: [3, 1, 1],
+      steps: ['Stand tall, light dumbbells at your sides.', 'Slight bend in elbows, lean forward a little.', 'Raise arms out to the side to shoulder height.', 'Lower in 2–3 seconds.'],
+      tip: 'Lead with your elbows.', mistake: 'Swinging heavy weights with the body.' },
+    rearFly: { name: 'Rear Delt Fly', group: 'shoulders', muscle: 'Rear delts', kind: 'upper', tempo: [2, 1, 1],
       steps: ['Bend forward with light dumbbells, or use the reverse pec deck.', 'Raise arms out to the sides.', 'Squeeze at shoulder height.', 'Lower slowly.'],
       tip: 'Rear delts make shoulders look round from the side.', mistake: 'Shrugging the traps.' },
-    incCurl: { name: 'Incline Dumbbell Curl', muscle: 'Biceps (long head)', kind: 'upper',
-      steps: ['Sit back on a 45° bench, arms hanging.', 'Curl up without moving the upper arm.', 'Squeeze at the top.', 'Lower to a full stretch.'],
-      tip: 'Lighter than normal curls, focus on the stretch.', mistake: 'Shoulders rolling forward.' },
-    shrug: { name: 'Dumbbell Shrug', muscle: 'Traps', kind: 'upper',
+    shrug: { name: 'Dumbbell Shrug', group: 'shoulders', muscle: 'Traps', kind: 'upper', tempo: [1, 1, 1],
       steps: ['Hold heavy dumbbells at your sides.', 'Lift shoulders straight up to your ears.', 'Hold 1 second.', 'Lower slowly.'],
       tip: 'Straight up and down, no rolling.', mistake: 'Bending the elbows.' },
-    squatL: { name: 'Barbell Back Squat (lighter)', muscle: 'Quads, glutes', kind: 'lower',
-      steps: ['Same setup as heavy squat day.', 'Use ~80% of your Monday weight.', 'Focus on depth and a slow 3-second lowering.', 'Drive up strongly.'],
-      tip: 'Second squat day builds skill and size.', mistake: 'Rushing reps.' },
-    bss: { name: 'Bulgarian Split Squat', muscle: 'Quads, glutes (each leg)', kind: 'lower',
-      steps: ['Back foot on a bench, front foot 2 steps ahead.', 'Lower straight down until back knee nearly touches the floor.', 'Drive up through the front heel.', 'Finish all reps, then switch legs.'],
-      tip: 'Start with bodyweight, add dumbbells when stable.', mistake: 'Front knee caving in.' },
-    legExt: { name: 'Leg Extension', muscle: 'Quads', kind: 'lower',
+    bbCurl: { name: 'Barbell Curl', group: 'biceps', muscle: 'Biceps', kind: 'upper', tempo: [3, 1, 1],
+      steps: ['Stand tall, shoulder-width grip, palms up.', 'Curl the bar up keeping elbows at your sides.', 'Squeeze at the top.', 'Lower in 2–3 seconds.'],
+      tip: 'An EZ bar is easier on the wrists.', mistake: 'Swinging the hips.' },
+    hammer: { name: 'Hammer Curl', group: 'biceps', muscle: 'Biceps, forearms', kind: 'upper', tempo: [2, 1, 1],
+      steps: ['Dumbbells at sides, palms facing each other.', 'Curl up without rotating the wrist.', 'Pause at shoulder height.', 'Lower slowly.'],
+      tip: 'Builds thicker-looking arms.', mistake: 'Moving the elbows forward.' },
+    incCurl: { name: 'Incline Dumbbell Curl', group: 'biceps', muscle: 'Biceps (long head)', kind: 'upper', tempo: [3, 1, 1],
+      steps: ['Sit back on a 45° bench, arms hanging.', 'Curl up without moving the upper arm.', 'Squeeze at the top.', 'Lower to a full stretch.'],
+      tip: 'Lighter than normal curls, focus on the stretch.', mistake: 'Shoulders rolling forward.' },
+    preacher: { name: 'Preacher Curl', group: 'biceps', muscle: 'Biceps (short head)', kind: 'upper', tempo: [3, 1, 1],
+      steps: ['Armpits snug on the pad, arms extended.', 'Curl the bar or dumbbell up.', 'Squeeze at the top.', 'Lower all the way under control.'],
+      tip: 'Do not let the weight drop at the bottom.', mistake: 'Lifting the elbows off the pad.' },
+    squat: { name: 'Barbell Back Squat', group: 'legs', muscle: 'Quads, glutes, core', kind: 'lower', tempo: [3, 1, 1],
+      steps: ['Bar on upper back, feet shoulder-width, toes slightly out.', 'Breathe in and brace your core.', 'Sit down between your heels until thighs are at least parallel.', 'Drive up through the whole foot, knees tracking over toes.'],
+      tip: 'Start with the empty bar and film your form from the side.', mistake: 'Knees caving inward.' },
+    squatL: { name: 'Barbell Back Squat (lighter)', group: 'legs', muscle: 'Quads, glutes', kind: 'lower', tempo: [3, 1, 1],
+      steps: ['Same setup as the heavy squat day.', 'Use about 80% of your Wednesday weight.', 'Focus on depth and a slow 3-second lowering.', 'Drive up strongly.'],
+      tip: 'The second squat day builds skill and size.', mistake: 'Rushing reps.' },
+    rdl: { name: 'Romanian Deadlift', group: 'legs', muscle: 'Hamstrings, glutes, lower back', kind: 'lower', tempo: [3, 1, 1],
+      steps: ['Hold bar at hip height, knees slightly bent.', 'Push hips back, bar sliding down your thighs.', 'Stop when you feel a strong hamstring stretch (around mid-shin).', 'Squeeze glutes to stand up.'],
+      tip: 'Back stays flat the entire time.', mistake: 'Turning it into a squat.' },
+    legPress: { name: 'Leg Press', group: 'legs', muscle: 'Quads, glutes', kind: 'lower', tempo: [3, 0, 1],
+      steps: ['Feet shoulder-width in the middle of the platform.', 'Lower until knees reach ~90°.', 'Press back up without locking the knees.', 'Keep your lower back flat on the pad.'],
+      tip: 'Control the bottom, do not let the hips lift.', mistake: 'Locking knees at the top.' },
+    legCurl: { name: 'Lying Leg Curl', group: 'legs', muscle: 'Hamstrings', kind: 'lower', tempo: [2, 1, 1],
+      steps: ['Lie face down, pad just above heels.', 'Curl heels toward your glutes.', 'Squeeze for 1 second.', 'Lower slowly.'],
+      tip: 'Keep hips pressed into the bench.', mistake: 'Lifting hips to cheat.' },
+    legExt: { name: 'Leg Extension', group: 'legs', muscle: 'Quads', kind: 'lower', tempo: [2, 1, 1],
       steps: ['Pad on lower shins, back against the seat.', 'Straighten legs fully.', 'Squeeze quads for 1 second.', 'Lower slowly.'],
       tip: 'Point toes up for a stronger squeeze.', mistake: 'Swinging the weight.' },
-    seatedCalf: { name: 'Seated Calf Raise', muscle: 'Calves (soleus)', kind: 'lower',
+    bss: { name: 'Bulgarian Split Squat', group: 'legs', muscle: 'Quads, glutes (each leg)', kind: 'lower', tempo: [3, 0, 1],
+      steps: ['Back foot on a bench, front foot two steps ahead.', 'Lower straight down until back knee nearly touches the floor.', 'Drive up through the front heel.', 'Finish all reps, then switch legs.'],
+      tip: 'Start with bodyweight, add dumbbells when stable.', mistake: 'Front knee caving in.' },
+    calf: { name: 'Standing Calf Raise', group: 'legs', muscle: 'Calves', kind: 'lower', tempo: [2, 1, 1],
+      steps: ['Balls of feet on a step or platform.', 'Lower heels for a full stretch.', 'Rise as high as possible.', 'Pause 1 second at top and bottom.'],
+      tip: 'Full range beats heavy weight for calves.', mistake: 'Bouncing quickly.' },
+    seatedCalf: { name: 'Seated Calf Raise', group: 'legs', muscle: 'Calves (soleus)', kind: 'lower', tempo: [2, 1, 1],
       steps: ['Pad on lower thighs, balls of feet on platform.', 'Lower heels for a stretch.', 'Rise up high.', 'Pause and repeat.'],
       tip: 'High reps, slow tempo.', mistake: 'Short bouncy reps.' },
-    hkr: { name: 'Hanging Knee Raise', muscle: 'Abs', kind: 'core',
+    plank: { name: 'Plank', group: 'abs', muscle: 'Core', kind: 'core', timed: true, tempo: [0, 0, 0],
+      steps: ['Forearms on the floor, elbows under shoulders.', 'Body in a straight line from head to heels.', 'Squeeze glutes and brace abs.', 'Breathe normally and hold.'],
+      tip: 'The reps column is seconds held.', mistake: 'Hips sagging or piking up.' },
+    hkr: { name: 'Hanging Knee Raise', group: 'abs', muscle: 'Abs', kind: 'core', bodyweight: true, tempo: [2, 0, 1],
       steps: ['Hang from a bar, shoulders engaged.', 'Raise knees toward your chest.', 'Curl your pelvis up at the top.', 'Lower slowly without swinging.'],
-      tip: 'Use the captain\'s chair if grip gives out.', mistake: 'Swinging for momentum.' },
+      tip: "Use the captain's chair if grip gives out.", mistake: 'Swinging for momentum.' },
+    cableCrunch: { name: 'Cable Crunch', group: 'abs', muscle: 'Abs', kind: 'core', tempo: [2, 1, 1],
+      steps: ['Kneel facing the cable, rope behind your head.', 'Crunch down by curling your ribs toward your hips.', 'Hold the squeeze for 1 second.', 'Return slowly.'],
+      tip: 'Hips stay still; only the spine curls.', mistake: 'Pulling with the arms.' },
   };
+  const GROUPS = { chest: 'Chest', back: 'Back', shoulders: 'Shoulders', biceps: 'Biceps', triceps: 'Triceps', legs: 'Legs', abs: 'Abs' };
 
   const ex = (id, sets, reps, rest) => ({ id, sets, reps, rest });
 
+  /* Dhruv's split. Legacy push/pull/legs days stay so old workout history still displays. */
   const DAYS = {
-    pushA: { name: 'Push A', focus: 'Chest · Shoulders · Triceps', color: 'g-warm',
-      list: [ex('bench', 4, '6-8', 120), ex('incDb', 3, '8-10', 90), ex('ohpDb', 3, '8-10', 90), ex('lateral', 3, '12-15', 60), ex('pushdown', 3, '10-12', 60), ex('ohTri', 2, '10-12', 60)] },
-    pullA: { name: 'Pull A', focus: 'Back · Rear delts · Biceps', color: 'g-blue',
+    chestTri: { name: 'Chest + Triceps', short: 'Chest', focus: 'Chest · Triceps', color: 'lime',
+      list: [ex('bench', 4, '6-8', 120), ex('incDb', 3, '8-10', 90), ex('fly', 3, '12-15', 60), ex('dips', 3, '6-12', 90), ex('pushdown', 3, '10-12', 60), ex('ohTri', 3, '10-12', 60)] },
+    backBi: { name: 'Back + Biceps', short: 'Back', focus: 'Back · Rear delts · Biceps', color: 'sky',
       list: [ex('pulldown', 4, '8-10', 90), ex('bbRow', 4, '6-8', 120), ex('cableRow', 3, '10-12', 90), ex('facePull', 3, '12-15', 60), ex('bbCurl', 3, '8-10', 60), ex('hammer', 3, '10-12', 60)] },
-    legsA: { name: 'Legs A', focus: 'Quads · Hamstrings · Calves · Core', color: 'g-green',
-      list: [ex('squat', 4, '6-8', 150), ex('rdl', 3, '8-10', 120), ex('legPress', 3, '10-12', 90), ex('legCurl', 3, '10-12', 60), ex('calf', 4, '12-15', 60), ex('plank', 3, '30-45', 45)] },
-    pushB: { name: 'Push B', focus: 'Shoulders · Chest · Triceps', color: 'g-warm',
-      list: [ex('ohp', 4, '6-8', 120), ex('dbBench', 3, '8-10', 90), ex('fly', 3, '12-15', 60), ex('lateral', 4, '12-15', 60), ex('dips', 3, '6-12', 90), ex('pushdown', 3, '12-15', 60)] },
-    pullB: { name: 'Pull B', focus: 'Back thickness · Traps · Biceps', color: 'g-blue',
-      list: [ex('deadlift', 3, '5', 180), ex('pullup', 3, '5-10', 120), ex('dbRow', 3, '8-10', 90), ex('rearFly', 3, '12-15', 60), ex('incCurl', 3, '10-12', 60), ex('shrug', 3, '12-15', 60)] },
-    legsB: { name: 'Legs B', focus: 'Quads · Glutes · Calves · Abs', color: 'g-green',
-      list: [ex('squatL', 3, '8-10', 120), ex('bss', 3, '8-10', 90), ex('legExt', 3, '12-15', 60), ex('legCurl', 3, '12-15', 60), ex('seatedCalf', 4, '15-20', 45), ex('hkr', 3, '10-15', 60)] },
-    rest: { name: 'Rest & Recover', focus: 'Walk · Stretch · Sleep', color: 'g-accent', list: [] },
+    legsAbs: { name: 'Legs + Abs', short: 'Legs', focus: 'Quads · Hamstrings · Calves · Abs', color: 'mint',
+      list: [ex('squat', 4, '6-8', 150), ex('rdl', 3, '8-10', 120), ex('legPress', 3, '10-12', 90), ex('legCurl', 3, '10-12', 60), ex('calf', 4, '12-15', 60), ex('hkr', 3, '10-15', 60), ex('plank', 3, '30-45', 45)] },
+    upper: { name: 'Chest + Back + Shoulders', short: 'Upper', focus: 'Chest · Back · Shoulders', color: 'lime',
+      list: [ex('dbBench', 3, '8-10', 90), ex('pullup', 3, '5-10', 120), ex('ohpDb', 3, '8-10', 90), ex('dbRow', 3, '8-10', 90), ex('lateral', 4, '12-15', 60), ex('rearFly', 3, '12-15', 60)] },
+    legsArms: { name: 'Legs + Arms', short: 'Legs', focus: 'Quads · Glutes · Biceps · Triceps', color: 'sky',
+      list: [ex('squatL', 3, '8-10', 120), ex('bss', 3, '8-10', 90), ex('legExt', 3, '12-15', 60), ex('seatedCalf', 4, '15-20', 45), ex('incCurl', 3, '10-12', 60), ex('skull', 3, '10-12', 60), ex('preacher', 2, '10-12', 60)] },
+    rest: { name: 'Rest & Recover', short: 'Rest', focus: 'Walk · Stretch · Sleep', color: 'mint', list: [] },
+    // legacy (v1) days, kept for history
+    pushA: { legacy: true, name: 'Push A', short: 'Push', focus: 'Chest · Shoulders · Triceps', color: 'lime', list: [ex('bench', 4, '6-8', 120), ex('incDb', 3, '8-10', 90), ex('ohpDb', 3, '8-10', 90), ex('lateral', 3, '12-15', 60), ex('pushdown', 3, '10-12', 60), ex('ohTri', 2, '10-12', 60)] },
+    pullA: { legacy: true, name: 'Pull A', short: 'Pull', focus: 'Back · Biceps', color: 'sky', list: [ex('pulldown', 4, '8-10', 90), ex('bbRow', 4, '6-8', 120), ex('cableRow', 3, '10-12', 90), ex('facePull', 3, '12-15', 60), ex('bbCurl', 3, '8-10', 60), ex('hammer', 3, '10-12', 60)] },
+    legsA: { legacy: true, name: 'Legs A', short: 'Legs', focus: 'Legs · Core', color: 'mint', list: [ex('squat', 4, '6-8', 150), ex('rdl', 3, '8-10', 120), ex('legPress', 3, '10-12', 90), ex('legCurl', 3, '10-12', 60), ex('calf', 4, '12-15', 60), ex('plank', 3, '30-45', 45)] },
+    pushB: { legacy: true, name: 'Push B', short: 'Push', focus: 'Shoulders · Chest · Triceps', color: 'lime', list: [ex('ohp', 4, '6-8', 120), ex('dbBench', 3, '8-10', 90), ex('fly', 3, '12-15', 60), ex('lateral', 4, '12-15', 60), ex('dips', 3, '6-12', 90), ex('pushdown', 3, '12-15', 60)] },
+    pullB: { legacy: true, name: 'Pull B', short: 'Pull', focus: 'Back · Traps · Biceps', color: 'sky', list: [ex('deadlift', 3, '5', 180), ex('pullup', 3, '5-10', 120), ex('dbRow', 3, '8-10', 90), ex('rearFly', 3, '12-15', 60), ex('incCurl', 3, '10-12', 60), ex('shrug', 3, '12-15', 60)] },
+    legsB: { legacy: true, name: 'Legs B', short: 'Legs', focus: 'Quads · Glutes · Abs', color: 'mint', list: [ex('squatL', 3, '8-10', 120), ex('bss', 3, '8-10', 90), ex('legExt', 3, '12-15', 60), ex('legCurl', 3, '12-15', 60), ex('seatedCalf', 4, '15-20', 45), ex('hkr', 3, '10-15', 60)] },
+  };
+  // index = JS getDay() (0 = Sunday)
+  const DEFAULT_SPLIT = ['rest', 'chestTri', 'backBi', 'legsAbs', 'rest', 'upper', 'legsArms'];
+
+  App.split = () => (App.state.gym.split && App.state.gym.split.length === 7 ? App.state.gym.split : DEFAULT_SPLIT);
+  App.exDef = (id) => EX[id] || (App.state.gym.customEx || {})[id] || { name: id, group: 'abs', muscle: '', kind: 'upper', steps: [], tip: '', mistake: '' };
+  App.dayDef = (key) => {
+    const base = DAYS[key] || DAYS.rest;
+    const ov = (App.state.gym.days || {})[key];
+    return ov && Array.isArray(ov.list) ? { ...base, list: ov.list } : base;
   };
 
-  // index = JS getDay() (0 = Sunday)
-  const WEEK = ['rest', 'pushA', 'pullA', 'legsA', 'pushB', 'pullB', 'legsB'];
-
   const WARMUP = ['5 min brisk walk or cycle', '10 arm circles each way', '10 bodyweight squats', '1–2 light warm-up sets of your first exercise'];
-
   const REST_DAY = [
     { t: '30–40 min walk', d: 'Keeps you active without hurting recovery.' },
     { t: '10 min full-body stretch', d: 'Hips, hamstrings, chest and shoulders.' },
     { t: 'Eat your full calories', d: 'Muscle grows on rest days. Do not skip meals.' },
-    { t: 'Sleep 8 hours', d: 'Most growth hormone is released in deep sleep.' },
+    { t: 'Sleep 7–9 hours', d: 'Most recovery happens during sleep.' },
     { t: 'Meal-prep for the week', d: 'Boil eggs, soak chana, portion peanuts.' },
   ];
-
   const COACH_TIPS = [
     'Aim to gain 0.25–0.5 kg per week. Faster than that is mostly fat.',
-    'Add weight or reps every week. Small jumps (1–2.5 kg) add up fast.',
-    'Drink at least 3 litres of water; more on hot days.',
-    'Sleep 7–9 hours. Training breaks muscle, sleep rebuilds it.',
-    'Hit your protein every day. It matters more than any supplement.',
-    'Creatine monohydrate (3–5 g/day) is the best-researched cheap supplement. Ask a doctor if unsure.',
-    'Take progress photos every 2 weeks in the same light.',
-    'Missed a day? Do not double up. Just continue the next session.',
+    'Add reps first, then weight. LifeOS only suggests more weight after every set hits the top of the rep range.',
+    'Drink water through the day; more on hot Haryana afternoons.',
+    'Sleep 7–9 hours. Training breaks muscle down, sleep rebuilds it.',
+    'Hit your protein most days. It matters more than any supplement.',
+    'Weigh yourself in the morning 3–4 times a week; LifeOS uses weekly averages so daily swings do not mislead you.',
+    'Missed a day? Do not double up. Continue with the next session.',
+    'Eat a carb + protein meal 1–2 hours before training if you train after work.',
+  ];
+
+  /* ---------- US CMA (IMA content specification; content unchanged for 2026) ---------- */
+  const CMA = {
+    p1: { name: 'Part 1', title: 'Financial Planning, Performance & Analytics', sections: [
+      { id: 'p1a', code: 'A', name: 'External Financial Reporting Decisions', weight: 15, topics: ['Financial statements', 'Asset recognition & valuation', 'Liabilities valuation', 'Equity transactions', 'Revenue recognition', 'Income measurement', 'Major US GAAP vs IFRS differences'] },
+      { id: 'p1b', code: 'B', name: 'Planning, Budgeting & Forecasting', weight: 20, topics: ['Strategic planning', 'Budgeting concepts', 'Forecasting techniques', 'Budget methodologies', 'Annual profit plan & schedules', 'Top-level planning & analysis'] },
+      { id: 'p1c', code: 'C', name: 'Performance Management', weight: 20, topics: ['Cost & variance measures', 'Responsibility centres & reporting segments', 'Performance measures'] },
+      { id: 'p1d', code: 'D', name: 'Cost Management', weight: 15, topics: ['Measurement concepts', 'Costing systems', 'Overhead costs', 'Supply chain management', 'Business process improvement'] },
+      { id: 'p1e', code: 'E', name: 'Internal Controls', weight: 15, topics: ['Governance, risk & compliance', 'Systems controls & security measures'] },
+      { id: 'p1f', code: 'F', name: 'Technology & Analytics', weight: 15, topics: ['Information systems', 'Data governance', 'Technology-enabled finance transformation', 'Data analytics'] },
+    ] },
+    p2: { name: 'Part 2', title: 'Strategic Financial Management', sections: [
+      { id: 'p2a', code: 'A', name: 'Financial Statement Analysis', weight: 20, topics: ['Basic financial statement analysis', 'Financial ratios', 'Profitability analysis', 'Special issues'] },
+      { id: 'p2b', code: 'B', name: 'Corporate Finance', weight: 20, topics: ['Risk & return', 'Long-term financial management', 'Raising capital', 'Working capital management', 'Corporate restructuring', 'International financial management'] },
+      { id: 'p2c', code: 'C', name: 'Decision Analysis', weight: 25, topics: ['Cost/volume/profit analysis', 'Marginal analysis', 'Pricing'] },
+      { id: 'p2d', code: 'D', name: 'Risk Management', weight: 10, topics: ['Enterprise risk'] },
+      { id: 'p2e', code: 'E', name: 'Investment Decisions', weight: 10, topics: ['Capital budgeting process', 'Capital investment analysis methods'] },
+      { id: 'p2f', code: 'F', name: 'Professional Ethics', weight: 15, topics: ['Business ethics', 'Ethics for the management accountant', 'Ethics for the organisation'] },
+    ] },
+  };
+  App.cmaBacklogDefaults = () => [];
+  const STUDY_TYPES = [
+    { value: 'study', label: 'Study' }, { value: 'mcq', label: 'MCQ practice' }, { value: 'hock', label: 'Hock session' },
+    { value: 'revision', label: 'Revision' }, { value: 'mock', label: 'Mock test' }, { value: 'backlog', label: 'Backlog subject' },
+  ];
+
+  /* ---------- career ---------- */
+  const skill = (id, name, milestones, resources, projects) => ({
+    id, name, milestones: milestones.map((t, i) => ({ id: id + i, title: t, done: false })),
+    resources: resources.map((t) => ({ id: App.uid(), title: t, url: '' })), projects: projects.map((t) => ({ id: App.uid(), title: t, done: false })),
+  });
+  App.careerDefaults = () => ({
+    skills: [
+      skill('excel', 'Advanced Excel', ['XLOOKUP, INDEX-MATCH, SUMIFS', 'Pivot tables & pivot charts', 'Power Query: clean and combine files', 'Dynamic arrays (FILTER, UNIQUE, LET)', 'Build an interactive dashboard'], ['Microsoft Support: Excel functions', 'ExcelJet formula guides', 'Leila Gharani (YouTube)'], ['Vendor reconciliation template', 'Monthly expense dashboard']),
+      skill('sql', 'SQL', ['SELECT, WHERE, ORDER BY', 'GROUP BY & aggregates', 'JOINs', 'Window functions', 'CTEs & subqueries'], ['SQLBolt', 'Mode SQL tutorial', 'LeetCode SQL 50'], ['Analyse a sample GL dataset', 'AP ageing query']),
+      skill('pbi', 'Power BI', ['Import & model data', 'DAX basics (CALCULATE, measures)', 'Time intelligence', 'Publish a report'], ['Microsoft Learn: Power BI', 'Guy in a Cube (YouTube)'], ['P&L dashboard', 'Budget vs actual report']),
+      skill('python', 'Python', ['Syntax, lists, dicts, loops', 'pandas: read, clean, group', 'openpyxl: automate Excel', 'Charts with matplotlib'], ['Kaggle Learn: Python & pandas', 'Automate the Boring Stuff'], ['Bank statement categoriser', '1099 vendor check script']),
+      skill('model', 'Financial Modeling', ['3-statement model', 'Revenue & cost drivers', 'DCF valuation', 'Scenario & sensitivity analysis'], ['CFI free courses', 'Wall Street Prep (blog)'], ['3-statement model of a listed company']),
+      skill('analysis', 'Financial Analysis', ['Ratio analysis', 'Variance analysis', 'Cash-flow analysis', 'Write an analysis memo'], ['Annual reports of NSE companies', 'CMA Part 2 Section A'], ['Peer comparison of two companies']),
+      skill('cma', 'US CMA', ['Part 1 preparation', 'Part 1 passed', 'Part 2 preparation', 'Part 2 passed', 'Experience requirement met'], ['IMA CMA handbook', 'Hock / Gleim review'], []),
+      skill('fpa', 'FP&A', ['Budgeting process', 'Rolling forecasts', 'Driver-based planning', 'Management reporting pack'], ['FP&A Trends articles', 'AFP FP&A guide'], ['Rolling 12-month forecast model']),
+      skill('auto', 'Financial Automation', ['Excel macros / VBA basics', 'Power Query refresh workflows', 'Python + Excel automation', 'QuickBooks reports export & automation'], ['Microsoft Learn: Power Automate'], ['Automate monthly reimbursement report']),
+    ],
+    portfolio: [],
+    timeline: [
+      { id: 't1', title: 'Accounts & Finance professional', note: 'Current role', date: '', done: true },
+      { id: 't2', title: 'Pass CMA Part 1', note: '', date: '', done: false },
+      { id: 't3', title: 'Pass CMA Part 2', note: '', date: '', done: false },
+      { id: 't4', title: 'Portfolio of 5 finance projects', note: 'Excel, Power BI, SQL, Python', date: '', done: false },
+      { id: 't5', title: 'Finance Analyst role', note: '', date: '', done: false },
+      { id: 't6', title: 'FP&A Analyst', note: 'Target role', date: '', done: false },
+    ],
+  });
+
+  /* ---------- Dubai Mission ---------- */
+  // Amounts start empty on purpose: every figure must be researched and confirmed by you.
+  App.dubaiDefaults = () => ({
+    targetDate: '', confirmedDate: '', travelConfirmed: false, startSavings: 0, deposits: [], includeEmployment: false, notes: '',
+    costs: [
+      { id: 'doc', group: 'personal', label: 'Passport & documentation', amount: null, verified: false, note: 'Passport renewal, attestation of degree certificates' },
+      { id: 'flight', group: 'personal', label: 'Flight tickets', amount: null, verified: false, note: 'One-way DEL → DXB' },
+      { id: 'tempstay', group: 'personal', label: 'Temporary accommodation', amount: null, verified: false, note: 'First 2–4 weeks' },
+      { id: 'deposit', group: 'personal', label: 'Accommodation deposit', amount: null, verified: false, note: 'Rent advance + security deposit' },
+      { id: 'food', group: 'personal', label: 'Food (first 2–3 months)', amount: null, verified: false, note: '' },
+      { id: 'transport', group: 'personal', label: 'Local transportation', amount: null, verified: false, note: 'Metro / Nol card, taxis' },
+      { id: 'medical', group: 'personal', label: 'Medical insurance', amount: null, verified: false, note: 'Check if the employer provides it' },
+      { id: 'emergency', group: 'personal', label: 'Emergency fund', amount: null, verified: false, note: '' },
+      { id: 'other', group: 'personal', label: 'Other relocation costs', amount: null, verified: false, note: 'SIM, furniture, misc.' },
+      { id: 'visa', group: 'employment', label: 'Visa & employment-related expenses', amount: null, verified: false, note: 'Often employer-paid. Verify with the employer and official UAE sources.' },
+      { id: 'medtest', group: 'employment', label: 'Visa medical test & Emirates ID', amount: null, verified: false, note: 'Verify current official fees' },
+    ],
+    checklist: [
+      'Complete US CMA', 'Improve financial analysis skills', 'Build professional portfolio', 'Prepare international CV', 'Improve interview skills',
+      'Research Dubai finance jobs', 'Research salary expectations', 'Research employers', 'Apply for suitable positions',
+      'Secure a legitimate employment opportunity', 'Verify visa and relocation requirements',
+    ].map((t, i) => ({ id: 'c' + i, title: t, done: false, doneAt: '', note: '' })),
+  });
+
+  /* ---------- Work OS ---------- */
+  const WORK_AREAS = [
+    { id: 'general', label: 'General', e: '🗂️' },
+    { id: 'reimb', label: 'Reimbursements', e: '🧾' },
+    { id: 'vendor', label: 'Vendor reconciliation', e: '🤝' },
+    { id: 'bank', label: 'Bank statements', e: '🏦' },
+    { id: 'payroll', label: 'Payroll', e: '💵' },
+    { id: 'tax', label: 'Taxation', e: '📑' },
+    { id: 'w9', label: 'W-9 / W-8', e: '📄' },
+    { id: 'f1099', label: '1099 verification', e: '✅' },
+    { id: 'qb', label: 'QuickBooks', e: '📗' },
+    { id: 'excel', label: 'Excel automation', e: '📊' },
+    { id: 'project', label: 'Project accounting', e: '🏗️' },
+    { id: 'timesheet', label: 'Timesheets', e: '⏱️' },
   ];
 
   Object.assign(App, {
-    ACTIVITY, GOAL_MODES, targets, FOODS: F, dietPlan, SHOPPING,
-    EX, DAYS, WEEK, WARMUP, REST_DAY, COACH_TIPS,
+    ACTIVITY, GOAL_MODES, targets, LEGACY_PLAN, EX, GROUPS, DAYS, DEFAULT_SPLIT, WARMUP, REST_DAY, COACH_TIPS,
+    CMA, STUDY_TYPES, WORK_AREAS,
   });
 })();

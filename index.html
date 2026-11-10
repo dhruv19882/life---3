@@ -1,59 +1,108 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-IN" data-theme="dark">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-  <meta name="theme-color" content="#0b0d12" />
-  <meta name="description" content="LifeOS: goals, to-dos, social media limits, budget, fitness and gym coach in one app." />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111315" id="metaTheme" />
+  <meta name="description" content="LifeOS: one private, offline-first system for health, fitness, nutrition, work, CMA study, money and goals." />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="LifeOS" />
+  <meta name="color-scheme" content="dark light" />
   <title>LifeOS</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="stylesheet" href="css/styles.css" />
+  <script>
+    /* Apply the saved theme before first paint to avoid a flash. */
+    (function () {
+      try {
+        var t = localStorage.getItem('lifeos.theme') || 'auto';
+        var h = new Date().getHours();
+        var dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) || (t === 'time' && (h < 7 || h >= 19));
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
-  <!-- Shared SVG gradients used by rings and charts -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- Shared SVG gradients for rings and charts -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
     <defs>
-      <linearGradient id="g-accent" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
-      <linearGradient id="g-green" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#a3e635"/></linearGradient>
-      <linearGradient id="g-warm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fb923c"/><stop offset="1" stop-color="#facc15"/></linearGradient>
-      <linearGradient id="g-red" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f43f5e"/><stop offset="1" stop-color="#fb7185"/></linearGradient>
-      <linearGradient id="g-blue" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b82f6"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
-      <linearGradient id="g-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8b5cf6" stop-opacity=".45"/><stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/></linearGradient>
+      <linearGradient id="g-lime" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#B9EF45"/><stop offset="1" stop-color="#DDF5B6"/></linearGradient>
+      <linearGradient id="g-sky" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8EDCF0"/><stop offset="1" stop-color="#DDF5B6"/></linearGradient>
+      <linearGradient id="g-mint" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#DDF5B6"/><stop offset="1" stop-color="#8EDCF0"/></linearGradient>
+      <linearGradient id="g-amber" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F5B83D"/><stop offset="1" stop-color="#FFD98A"/></linearGradient>
+      <linearGradient id="g-red" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F2645A"/><stop offset="1" stop-color="#FF9A8F"/></linearGradient>
+      <linearGradient id="g-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B9EF45" stop-opacity=".35"/><stop offset="1" stop-color="#B9EF45" stop-opacity="0"/></linearGradient>
+      <linearGradient id="g-area-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8EDCF0" stop-opacity=".35"/><stop offset="1" stop-color="#8EDCF0" stop-opacity="0"/></linearGradient>
     </defs>
   </svg>
 
-  <div class="bg-blobs" aria-hidden="true"><span></span><span></span><span></span></div>
+  <div class="ambient" aria-hidden="true"><span></span><span></span></div>
 
-  <main id="view" class="view"></main>
+  <!-- Splash / logo reveal -->
+  <div id="splash" class="splash" aria-hidden="true">
+    <div class="splash-logo">
+      <svg viewBox="0 0 120 120" width="96" height="96">
+        <circle cx="60" cy="60" r="48" class="sl-track"/>
+        <circle cx="60" cy="60" r="48" class="sl-ring" pathLength="1"/>
+        <circle cx="60" cy="60" r="32" class="sl-ring2" pathLength="1"/>
+        <circle cx="60" cy="60" r="7" class="sl-dot"/>
+      </svg>
+      <div class="splash-word"><span>L</span><span>i</span><span>f</span><span>e</span><b>O</b><b>S</b></div>
+      <p class="splash-tag">One Life. One System. Total Clarity.</p>
+    </div>
+  </div>
+
+  <div class="shell">
+    <aside class="sidebar" id="sidebar" aria-label="Sections"></aside>
+    <main id="view" class="view" tabindex="-1"></main>
+  </div>
 
   <nav class="tabbar" id="tabbar" aria-label="Main">
     <div class="tab-indicator" id="tabIndicator"></div>
     <button class="tab" data-act="go" data-r="home"><i data-icon="home"></i><span>Home</span></button>
-    <button class="tab" data-act="go" data-r="goals"><i data-icon="target"></i><span>Goals</span></button>
-    <button class="tab" data-act="go" data-r="social"><i data-icon="phone"></i><span>Social</span></button>
-    <button class="tab" data-act="go" data-r="money"><i data-icon="wallet"></i><span>Money</span></button>
-    <button class="tab" data-act="go" data-r="gym"><i data-icon="dumbbell"></i><span>Gym</span></button>
+    <button class="tab" data-act="go" data-r="fitness"><i data-icon="dumbbell"></i><span>Fitness</span></button>
+    <span class="tab-gap" aria-hidden="true"></span>
+    <button class="tab" data-act="go" data-r="work"><i data-icon="briefcase"></i><span>Work</span></button>
+    <button class="tab" data-act="go" data-r="progress"><i data-icon="chart"></i><span>Progress</span></button>
+    <button class="tab" data-act="go" data-r="more"><i data-icon="grid"></i><span>More</span></button>
   </nav>
+  <button class="fab" id="fab" data-act="fab" aria-label="Quick add" aria-expanded="false"><i data-icon="plus"></i></button>
+  <div id="fabMenu" class="fab-menu" hidden></div>
 
   <div id="sheets"></div>
+  <div id="overlay" class="overlay" hidden></div>
   <div id="toasts" class="toasts" aria-live="polite"></div>
   <div id="restTimer" class="rest-timer" hidden></div>
-  <canvas id="confetti" class="confetti"></canvas>
+  <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
+
+  <noscript><p style="padding:24px;color:#fff">LifeOS needs JavaScript enabled.</p></noscript>
 
   <script src="js/core.js"></script>
+  <script src="js/store.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/foods.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/engine.js"></script>
   <script src="js/views/home.js"></script>
+  <script src="js/views/fitness.js"></script>
+  <script src="js/views/nutrition.js"></script>
+  <script src="js/views/food.js"></script>
+  <script src="js/views/money.js"></script>
+  <script src="js/views/fees.js"></script>
+  <script src="js/views/dubai.js"></script>
+  <script src="js/views/work.js"></script>
+  <script src="js/views/cma.js"></script>
+  <script src="js/views/career.js"></script>
   <script src="js/views/goals.js"></script>
   <script src="js/views/social.js"></script>
-  <script src="js/views/money.js"></script>
-  <script src="js/views/gym.js"></script>
+  <script src="js/views/progress.js"></script>
+  <script src="js/views/more.js"></script>
+  <script src="js/views/settings.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
