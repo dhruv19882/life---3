@@ -35,7 +35,7 @@ function ok(c, msg) { if (!c) throw new Error(msg || 'assertion failed'); }
 
 function fresh(profile = {}) {
   App.state = App.migrate(null);
-  App.state.profile = { ...App.profileDefaults(), name: 'Test', age: 22, height: 170, weight: 49, activity: 1.55, mode: 'bulk', targets: [55, 60], ...profile };
+  App.state.profile = { ...App.profileDefaults(), name: 'Test', age: 25, height: 175, weight: 60, activity: 1.55, mode: 'bulk', targets: [55, 60], ...profile };
   App.state.nutrition.plan = App.defaultPlan();
   return App.state;
 }
@@ -81,16 +81,16 @@ t('Day totals sum logged items', () => {
 t('Default plan has costs for every item', () => { const pt = App.planTotals ? App.planTotals() : null; ok(App.defaultPlan().every((m) => m.items.every((i) => App.foodById(i.foodId))), 'all plan foods exist'); });
 
 console.log('\nTargets');
-t('Mifflin-St Jeor, 22 y, 170 cm, 49 kg, moderate, lean bulk', () => {
+t('Mifflin-St Jeor, 25 y, 175 cm, 60 kg, moderate, lean bulk', () => {
   fresh();
   const T = App.targets(App.state.profile, {});
-  eq(T.bmr, 1448); eq(T.tdee, 2244); eq(T.kcal, 2640); eq(T.protein, 98); eq(T.fat, 73);
-  eq(T.carbs, Math.round((2640 - 98 * 4 - 73 * 9) / 4));
-  eq(T.waterMl, 2200);
+  eq(T.bmr, 1574); eq(T.tdee, 2439); eq(T.kcal, 2840); eq(T.protein, 120); eq(T.fat, 79);
+  eq(T.carbs, Math.round((2840 - 120 * 4 - 79 * 9) / 4));
+  eq(T.waterMl, 2600);
 });
 t('Overrides replace only the overridden target', () => {
-  const T = App.targets(App.state.profile, { protein: 120 });
-  eq(T.protein, 120); eq(T.kcal, 2640);
+  const T = App.targets(App.state.profile, { protein: 150 });
+  eq(T.protein, 150); eq(T.kcal, 2840);
 });
 
 console.log('\nFees & payments');

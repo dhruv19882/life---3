@@ -26,7 +26,7 @@ On iPhone use Safari → Share → **Add to Home Screen**. Haptics are not avail
 
 ## First run
 
-- Fill in the profile form, **or** tap **Restore a backup or starter file** and choose your private `lifeos-starter-dhruv.json`.
+- Fill in the profile form, **or** tap **Restore a backup or starter file** and choose your private starter file (`lifeos-starter-*.json`).
 - Set a CMA weekly target, a monthly budget and the Dubai target date when you are ready.
 
 ## Updating

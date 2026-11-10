@@ -174,7 +174,7 @@
 
   const ex = (id, sets, reps, rest) => ({ id, sets, reps, rest });
 
-  /* Dhruv's split. Legacy push/pull/legs days stay so old workout history still displays. */
+  /* Default split (editable in Fitness → Split). Legacy push/pull/legs days stay so old workout history still displays. */
   const DAYS = {
     chestTri: { name: 'Chest + Triceps', short: 'Chest', focus: 'Chest · Triceps', color: 'lime',
       list: [ex('bench', 4, '6-8', 120), ex('incDb', 3, '8-10', 90), ex('fly', 3, '12-15', 60), ex('dips', 3, '6-12', 90), ex('pushdown', 3, '10-12', 60), ex('ohTri', 3, '10-12', 60)] },

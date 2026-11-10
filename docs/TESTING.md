@@ -9,7 +9,7 @@ Date: 10 November 2026 · Build: `lifeos-v3.0.0` · Data schema: v3
 | Area | What is checked |
 | --- | --- |
 | Nutrition | 2 roti + 150 g dal + 150 g rice + 100 g curd = 654 kcal, 23.65 g protein, 480 g; glass and ml units; unknown unit returns 0 (no guessing); serving-based custom foods; edited reference values; recipes per serving; day totals and meals completed; default plan foods exist |
-| Targets | Mifflin-St Jeor for 22 y / 170 cm / 49 kg / moderate / lean bulk = BMR 1,448, TDEE 2,244, 2,640 kcal, 98 g protein, 73 g fat, water 2,200 ml; overrides replace only the overridden value |
+| Targets | Mifflin-St Jeor for a 25 y / 175 cm / 60 kg / moderate / lean-bulk example = BMR 1,574, TDEE 2,439, 2,840 kcal, 120 g protein, 79 g fat, water 2,600 ml; overrides replace only the overridden value |
 | Fees | ₹10,000 − ₹4,000 = ₹6,000 outstanding (Partially Paid); overdue after due date with day count; installments summing to the total = Paid, never negative; pending; totals per kind |
 | Finance | Income, expense, refund and transfer handling; balance formula; safe-to-spend per day; money to collect excluded from balance; ten ₹0.10 expenses = ₹1.00 exactly; recurring item due only once per month |
 | Dubai | Required / saved / remaining / monthly target; employment costs excluded unless included; 7 unknown costs flagged; target date ≠ confirmed |
@@ -38,7 +38,7 @@ Driven through the real UI with Playwright.
 | Dubai deposit ₹5,000 recorded as a transfer (balance reduced, not counted as spending) | Pass |
 | All 16 routes and every sub-tab render | Pass |
 | Data after page reload | Pass: meals, transactions, fees, journal all present |
-| Restore private starter file from onboarding | Pass: profile, backlog subjects, 2,640 kcal target |
+| Restore private starter file from onboarding | Pass: profile, backlog subjects and targets restored |
 | JavaScript errors / console errors during all of the above | **None** |
 
 ### Offline (airplane mode)
